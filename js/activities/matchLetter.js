@@ -8,10 +8,12 @@
  */
 
 import { el, shuffle } from '../dom.js';
-import { say, saySound, sfx } from '../audio.js';
+import { preloadSounds, say, saySound, sfx } from '../audio.js';
 import { floatFrom, shake } from '../fx.js';
 
 export function mount(page, host, finish) {
+  preloadSounds(page.pairs.map((x) => x.letter));
+
   const where = page.position === 'first' ? 'first' : 'last';
   const total = page.pairs.length;
   let joined = 0;

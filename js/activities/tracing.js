@@ -16,7 +16,7 @@
  */
 
 import { el } from '../dom.js';
-import { saySound, sfx } from '../audio.js';
+import { preloadSounds, saySound, sfx } from '../audio.js';
 import { confetti, shake } from '../fx.js';
 
 const CELL = 7;            // grid resolution in CSS pixels
@@ -30,6 +30,7 @@ const GUIDE_FONT = '"Comic Sans MS", "Chalkboard SE", ui-rounded, "Segoe UI", sy
 export function mount(page, host, finish) {
   // Each letter is practised in both cases, in the workbook's order.
   const steps = page.letters.flatMap((l) => [l, l.toUpperCase()]);
+  preloadSounds(page.letters);
   const scores = [];
   let index = 0;
 

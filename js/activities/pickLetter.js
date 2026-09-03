@@ -6,10 +6,12 @@
  */
 
 import { el } from '../dom.js';
-import { say, saySound, sfx } from '../audio.js';
+import { preloadSounds, say, saySound, sfx } from '../audio.js';
 import { floatFrom, shake } from '../fx.js';
 
 export function mount(page, host, finish) {
+  preloadSounds(page.questions.flatMap((q) => q.options));
+
   const where = page.position === 'first' ? 'first' : 'last';
   const total = page.questions.length;
   let solved = 0;

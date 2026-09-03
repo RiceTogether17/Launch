@@ -6,6 +6,7 @@
  * The chimes are synthesised with WebAudio so the app ships no audio files.
  */
 
+import { GRAPHEME_WORDS, PHONEME_FOR_GRAPHEME } from './graphemes.js';
 import { getState } from './state.js';
 
 let ctx = null;
@@ -100,84 +101,116 @@ export function say(text, { rate = 0.85, pitch = 1.1 } = {}) {
 }
 
 /**
- * Letter sounds, not letter names: a child sorting by "first sound" needs
- * /f/, not "eff".
+ * Letter sounds, not letter names.
  *
- * The curriculum manual is emphatic about *how* those sounds are voiced
- * (CDM p20, "Commonly Mispronounced Sounds"): a "heavy u" after a consonant —
- * /cuh/, /buh/, /muh/, /luh/ — is wrong, and teachers are told to correct it
- * proactively, because the child is then saying two sounds where there is one.
+ * This used to hand the browser's speech synthesiser respellings like "fff"
+ * and "mmm". That was a mistake: a synthesiser given an unpronounceable
+ * cluster falls back on spelling it out, so the app said "eff eff eff" —
+ * letter *names*, the very thing the curriculum manual works to prevent
+ * (CDM p12, p20). No respelling avoids this; the engine is built to read
+ * words, and a phoneme is not a word.
  *
- * That rules out synthesising most consonants in isolation, since a speech
- * engine given "buh" says exactly the thing the programme works to undo, and
- * given "b" says the letter *name*. So sounds are voiced two different ways:
+ * So the sounds are no longer synthesised at run time. Each one is a short
+ * pre-rendered clip in audio/phonemes/, generated from explicit phoneme codes
+ * by tools/build-phonemes.py. Words are still spoken by the browser, which
+ * does them well and naturally.
  *
- *   - Continuants and short vowels can genuinely be held on their own, so
- *     they are spoken in isolation.
- *   - Stops cannot. For those the app falls back on the Grapheme Wall Chart's
- *     own method (CDM p12): say the key word and let the child hear the sound
- *     at the front of it.
+ * The clips are plain 22 kHz mono WAVs named after the sound they carry, so
+ * anyone who would rather have a real teacher's voice than a synthesised one
+ * can record over them without touching this code.
  */
 
-/** Sounds that can be held in isolation without a vowel creeping in. */
-const CONTINUANTS = {
-  f: 'fff', l: 'lll', m: 'mmm', n: 'nnn', r: 'rrr',
-  s: 'sss', v: 'vvv', z: 'zzz', h: 'hhh',
-  sh: 'shhh', th: 'thhh', ng: 'ng',
-};
 
-/**
- * Short vowel sounds only. Phonemic awareness activities range across long
- * vowels and diphthongs, but phonics access uses short vowels alone
- * (CDM p33, "Should I be focusing on just short vowel sounds?").
- */
-const SHORT_VOWELS = { a: 'ah', e: 'eh', i: 'ih', o: 'oh', u: 'uh' };
+export { GRAPHEME_WORDS };
 
-/**
- * The LCentral Grapheme Wall Chart's key word for each grapheme. These are
- * the pictures the child meets on the chart at the start of every lesson, so
- * they are the words the app uses to anchor a sound it cannot say alone.
- */
-export const GRAPHEME_WORDS = {
-  a: 'apple', b: 'bat', c: 'cat', d: 'dog', e: 'eggs', f: 'fish',
-  g: 'goat', h: 'horse', i: 'insect', j: 'jet', k: 'kite', l: 'lizard',
-  m: 'mouth', n: 'noodles', o: 'octopus', p: 'pig', q: 'queen', r: 'rat',
-  s: 'starfish', t: 'tiger', u: 'umbrella', v: 'van', w: 'worm', x: 'axe',
-  y: 'yacht', z: 'zebra',
-  ch: 'chick', sh: 'shell', th: 'thumb', ng: 'king',
-};
+const CLIPS = new URL('../audio/phonemes/', import.meta.url);
+const decoded = new Map();   // phoneme id -> AudioBuffer
+const loading = new Map();   // phoneme id -> Promise
+const missing = new Set();   // ids whose clip could not be loaded
 
-/**
- * Voice a letter's sound as faithfully as a speech engine allows: held on its
- * own where that is honest, and otherwise as the wall-chart key word.
- */
-export function saySound(letter) {
-  const key = String(letter).toLowerCase();
-  const isolated = CONTINUANTS[key] || SHORT_VOWELS[key];
-  if (isolated) {
-    say(isolated, { rate: 0.7 });
-  } else if (GRAPHEME_WORDS[key]) {
-    say(GRAPHEME_WORDS[key]);
-  } else {
-    say(key);
+function loadPhoneme(id) {
+  if (decoded.has(id)) return Promise.resolve(decoded.get(id));
+  if (loading.has(id)) return loading.get(id);
+
+  const ac = audioCtx();
+  if (!ac) return Promise.resolve(null);
+
+  const job = fetch(new URL(`${id}.wav`, CLIPS))
+    .then((res) => {
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then((bytes) => ac.decodeAudioData(bytes))
+    .then((buffer) => {
+      decoded.set(id, buffer);
+      return buffer;
+    })
+    .catch(() => {
+      // A missing clip must not silence the app; the caller says the key word.
+      missing.add(id);
+      return null;
+    })
+    .finally(() => loading.delete(id));
+
+  loading.set(id, job);
+  return job;
+}
+
+/** Warm the cache for the graphemes a page is about to use. */
+export function preloadSounds(letters) {
+  if (!enabled()) return;
+  for (const letter of letters) {
+    const id = PHONEME_FOR_GRAPHEME[String(letter).toLowerCase()];
+    if (id && !decoded.has(id) && !missing.has(id)) loadPhoneme(id);
   }
 }
 
-/** True when the sound can be spoken alone, so callers can word it correctly. */
-export function hasIsolatedSound(letter) {
+let playing = null;
+
+/** Play a letter's sound: the real phoneme, never a letter name. */
+export function saySound(letter) {
+  if (!enabled()) return;
   const key = String(letter).toLowerCase();
-  return Boolean(CONTINUANTS[key] || SHORT_VOWELS[key]);
+  const id = PHONEME_FOR_GRAPHEME[key];
+
+  if (!id || missing.has(id)) {
+    sayKeyWord(key);
+    return;
+  }
+
+  loadPhoneme(id).then((buffer) => {
+    const ac = audioCtx();
+    if (!buffer || !ac || !enabled()) {
+      sayKeyWord(key);
+      return;
+    }
+    // Stop any sound still ringing, so quick taps don't pile up.
+    try { playing?.stop(); } catch { /* already ended */ }
+    const source = ac.createBufferSource();
+    const gain = ac.createGain();
+    gain.gain.value = 0.9;
+    source.buffer = buffer;
+    source.connect(gain).connect(ac.destination);
+    source.start();
+    playing = source;
+  });
+}
+
+/** Last resort when a clip can't be played: the wall chart's word for it. */
+function sayKeyWord(key) {
+  const word = GRAPHEME_WORDS[key];
+  if (word) say(word);
 }
 
 /**
  * "fish … /f/" — the word first, then the sound inside it.
  *
- * The order matters and is not ours: "The correct process is to say the
- * picture word firstly followed by the sound so the students hear the sound
- * as part of the word, not as a sound in isolation." (CDM p12)
+ * The order is the manual's: "The correct process is to say the picture word
+ * firstly followed by the sound so the students hear the sound as part of the
+ * word, not as a sound in isolation." (CDM p12)
  */
 export function sayWordThenSound(word, letter) {
-  if (!enabled() || !('speechSynthesis' in window)) return;
+  if (!enabled()) return;
   say(word);
-  if (hasIsolatedSound(letter)) setTimeout(() => saySound(letter), 900);
+  setTimeout(() => saySound(letter), 900);
 }
