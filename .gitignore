@@ -1,2 +1,6 @@
 node_modules/
 .DS_Store
+
+# Python bytecode, generated when tools/build-phonemes.py is run or imported
+__pycache__/
+*.pyc
