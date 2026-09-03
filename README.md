@@ -36,13 +36,50 @@ rules are needed.
 
 ### Sound
 
-Words and letter sounds are spoken with the Web Speech API — this is a
-phonics book, and for half these pages *hearing* the word is the exercise.
-The chimes are synthesised with WebAudio, so the app ships no audio files.
-Sound can be muted from the header.
+Two different jobs, done two different ways.
 
-Letters are voiced as sounds, not names, and *how* they are voiced follows the
-curriculum manual closely — see below.
+**Letter sounds are pre-rendered audio clips**, one per phoneme, in
+`audio/phonemes/`. They have to be: the app originally handed respellings like
+`"fff"` and `"mmm"` to the browser's speech synthesiser, and a synthesiser
+given an unpronounceable cluster falls back on spelling it out — so it said
+"eff eff eff", letter *names*, the exact thing the manual works to prevent. No
+respelling avoids that, because the engine is built to read words and a phoneme
+is not a word.
+
+**Words are still spoken by the browser**, which does them well and naturally.
+
+The chimes are synthesised with WebAudio. Sound can be muted from the header.
+
+### The phoneme clips
+
+`tools/build-phonemes.py` generates all 44 of them with espeak-ng, a formant
+synthesiser that takes phoneme codes directly — so it is never handed a letter
+to read and cannot produce a letter name. Regenerate with:
+
+```sh
+apt-get install espeak-ng && python3 tools/build-phonemes.py
+```
+
+It reports the length, loudness and brightness of every clip and fails if any
+comes out silent, too short, or with a click at a loop join.
+
+Two problems it has to solve. **Voiced stops are silent in isolation** — ask
+espeak for a bare /b/, /d/, /g/ or /j/ and you get nothing at all, correctly,
+because a stop is a release of air and with no following vowel there is nothing
+to release into. Real phonics recordings hit the same wall and solve it the
+same way: synthesise the consonant with a vowel, then cut just after the burst.
+The few tens of milliseconds kept are the formant transition, which is exactly
+what distinguishes /b/ from /d/ from /g/, so it has to stay — what must not
+stay is a full "buh", and it doesn't. **Nasals come out as a 30 ms blip**, too
+short to hear or copy; since a nasal is a steady hum, its middle is looped for
+a whole number of pitch periods, which joins without a click.
+
+The clips are plain 22 kHz mono WAVs (632 KB for the set), named after the
+sound they carry and loaded on demand. If you would rather have a real
+teacher's voice than a synthesised one, record over them with the same
+filenames — no code changes needed. If a clip is missing or fails to load, the
+app falls back to speaking the Grapheme Wall Chart's key word for that letter,
+so a broken file never leaves a child with silence.
 
 ## Curriculum alignment
 
@@ -51,10 +88,10 @@ several decisions that look arbitrary are taken straight from it:
 
 - **No "-uh" on consonants.** The manual (p20) calls out `/buh/`, `/cuh/`,
   `/muh/`, `/luh/` as errors teachers must correct on the spot, because the
-  child is saying two sounds where there is one. A speech engine given `"buh"`
-  produces exactly that, and given `"b"` says the letter *name*. So continuants
-  and short vowels are spoken in isolation, where that is honest, and stops are
-  voiced as their Grapheme Wall Chart key word instead — the chart's own method.
+  child is saying two sounds where there is one. This is why the sounds are
+  pre-rendered from phoneme codes rather than spoken by a synthesiser: a stop's
+  clip is cut a few tens of milliseconds after its burst, which is a release
+  rather than a syllable.
 - **The word comes before the sound.** "The correct process is to say the
   picture word firstly followed by the sound so the students hear the sound as
   part of the word, not as a sound in isolation." (p12)
@@ -140,11 +177,14 @@ js/
   fx.js                     confetti, floating XP, toasts
   dom.js                    small element helper
   data/pages.js             all 51 pages of content
+  graphemes.js              grapheme -> phoneme, and wall chart key words
   phonemeMatch.js           judging a spoken letter sound (pure, tested)
   listen.js                 Web Speech API recogniser wrapper
+audio/phonemes/             one short clip per phoneme (generated)
   activities/               one module per exercise type
   screens/                  home, map, activity host, trophies
-tools/check-content.mjs     content consistency check
+tools/build-phonemes.py     generates the phoneme clips
+tools/check-content.mjs     content and audio-coverage check
 tools/check-speech.mjs      tests for the spoken-sound judge
 ```
 
@@ -163,7 +203,9 @@ headless browser:
 node tools/check-speech.mjs
 ```
 
-The content check covers all 51 pages for the mistakes that are easy to make by hand: an
+The content check also confirms every sound the app can be asked to play has a
+clip on disk, so the map and the audio can't drift apart. It covers all 51
+pages for the mistakes that are easy to make by hand: an
 answer missing from its own options, a hexagon whose letters don't spell its
 words, a picture filed under the wrong sound, a segmenting blank in the wrong
 position. English spelling isn't phonetic, so words whose sound and spelling

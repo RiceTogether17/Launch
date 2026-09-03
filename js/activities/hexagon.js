@@ -8,10 +8,12 @@
  */
 
 import { el } from '../dom.js';
-import { say, saySound, sfx } from '../audio.js';
+import { preloadSounds, say, saySound, sfx } from '../audio.js';
 import { floatFrom, shake } from '../fx.js';
 
 export function mount(page, host, finish) {
+  preloadSounds(page.hexLetters);
+
   const total = page.words.length;
   let solved = 0;
   let mistakes = 0;

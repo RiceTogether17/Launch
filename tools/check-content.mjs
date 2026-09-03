@@ -9,7 +9,14 @@
  * sound. Run it after editing the page data.
  */
 
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 import { PAGES } from '../js/data/pages.js';
+import { PHONEME_FOR_GRAPHEME, phonemeFor } from '../js/graphemes.js';
+
+const CLIPS = join(dirname(fileURLToPath(import.meta.url)), '..', 'audio', 'phonemes');
 
 /**
  * Words whose final (or first) sound is not their final (or first) letter.
@@ -107,5 +114,30 @@ for (const pg of PAGES) {
   }
 }
 
-console.log(`checked ${PAGES.length} pages`);
+// Every sound the app can be asked to play must have a clip on disk. Without
+// this, a missing file shows up as the app quietly saying a word instead of a
+// sound — which is exactly the failure the recorded clips exist to prevent.
+const spoken = new Set('abcdefghijklmnopqrstuvwxyz');  // Automatic Access uses them all
+for (const pg of PAGES) {
+  if (pg.sound) spoken.add(pg.sound);
+  for (const q of pg.questions ?? []) { spoken.add(q.answer); q.options.forEach((o) => spoken.add(o)); }
+  for (const pr of pg.pairs ?? []) spoken.add(pr.letter);
+  for (const w of pg.words ?? []) spoken.add(w.word[w.blank]);
+  for (const l of pg.hexLetters ?? []) spoken.add(l);
+  for (const l of pg.letters ?? []) spoken.add(l);
+}
+for (const letter of [...spoken].sort()) {
+  const id = phonemeFor(letter);
+  if (!id) problems.push(`no phoneme mapped for grapheme "${letter}"`);
+  else if (!existsSync(join(CLIPS, `${id}.wav`))) {
+    problems.push(`grapheme "${letter}" needs audio/phonemes/${id}.wav, which is missing`);
+  }
+}
+
+// And every mapped phoneme should have a clip, so the map can't drift.
+for (const id of new Set(Object.values(PHONEME_FOR_GRAPHEME))) {
+  if (!existsSync(join(CLIPS, `${id}.wav`))) problems.push(`audio/phonemes/${id}.wav is missing`);
+}
+
+console.log(`checked ${PAGES.length} pages and ${spoken.size} spoken graphemes`);
 console.log(problems.length ? problems.join('\n') : '✅ content data is consistent');

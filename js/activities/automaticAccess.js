@@ -24,7 +24,7 @@
  */
 
 import { el, shuffle } from '../dom.js';
-import { GRAPHEME_WORDS, say, saySound, sfx } from '../audio.js';
+import { GRAPHEME_WORDS, preloadSounds, say, saySound, sfx } from '../audio.js';
 import { judge, keyWordFor } from '../phonemeMatch.js';
 import { listenOnce, listeningSupported } from '../listen.js';
 import { confetti, shake } from '../fx.js';
@@ -37,6 +37,7 @@ export function mount(page, host, finish) {
   // The workbook scrambles the letters; the child works across the chart
   // rather than reciting a sequence they may simply have memorised.
   const order = shuffle(ALPHABET);
+  preloadSounds(ALPHABET);
 
   let index = 0;
   let stumbles = 0;      // letters that needed a prompt before they were right

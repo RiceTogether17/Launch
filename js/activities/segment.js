@@ -8,7 +8,7 @@
  */
 
 import { el, shuffle } from '../dom.js';
-import { say, saySound, sfx } from '../audio.js';
+import { preloadSounds, say, saySound, sfx } from '../audio.js';
 import { floatFrom, shake } from '../fx.js';
 
 const FILLERS = 'bcdfghjklmnprstvwz'.split('');
@@ -32,6 +32,8 @@ function optionsFor(answer, page) {
 }
 
 export function mount(page, host, finish) {
+  preloadSounds(page.words.map((w) => w.word[w.blank]));
+
   const where = page.position === 'first' ? 'first' : 'last';
   const total = page.words.length;
   let solved = 0;

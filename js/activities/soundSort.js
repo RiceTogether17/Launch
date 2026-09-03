@@ -8,10 +8,12 @@
  */
 
 import { el, shuffle } from '../dom.js';
-import { hasIsolatedSound, say, saySound, sayWordThenSound, sfx } from '../audio.js';
+import { preloadSounds, say, saySound, sayWordThenSound, sfx } from '../audio.js';
 import { shake } from '../fx.js';
 
 export function mount(page, host, finish) {
+  preloadSounds([page.sound]);
+
   const picked = new Set();
   const matches = new Set(page.matches);
   const order = shuffle(page.items);
@@ -110,10 +112,8 @@ export function mount(page, host, finish) {
 
   const listenBtn = el('button.btn.ghost', {
     type: 'button',
-    text: hasIsolatedSound(page.sound)
-      ? `🔉 Hear the ${where} sound`
-      : `🔉 Hear "${page.target.word}" again`,
-    onclick: () => sayWordThenSound(page.target.word, page.sound),
+    text: `🔉 Hear the ${where} sound`,
+    onclick: () => saySound(page.sound),
   });
 
   host.append(
