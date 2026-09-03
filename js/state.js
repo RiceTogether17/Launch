@@ -143,6 +143,9 @@ export function completePage(page, accuracy, baseXp = 20) {
     best: Math.max(accuracy, prev?.best || 0),
     date: new Date().toISOString().slice(0, 10),
     attempts: (prev?.attempts || 0) + 1,
+    // Level 4 means "demonstrates consistently", so clean runs are counted
+    // rather than just remembering the single best one. See skillLevel().
+    clean: (prev?.clean || 0) + (accuracy >= 0.95 ? 1 : 0),
   };
 
   touchStreak();
@@ -174,6 +177,53 @@ export function recordTime(letterCase, seconds, clean = false) {
 
 export function bestTime(letterCase) {
   return data.bestTimes[`alphabet-${letterCase}`] ?? null;
+}
+
+// ------------------------------------------------------------ skill levels
+
+/**
+ * The programme's own progress scale, from the LaunchPad Outcomes Record
+ * (CDM p7). These are the levels a teacher circles on the record sheet, and
+ * Level 4 across all outcomes is the criterion for promotion to LiftOff.
+ */
+export const SKILL_LEVELS = [
+  { level: 1, name: 'Introduced',                hint: 'Has had a first go at this page.' },
+  { level: 2, name: 'Emerging',                  hint: 'Getting there, with some help.' },
+  { level: 3, name: 'Demonstrates occasionally', hint: 'Mostly right, and needing less help.' },
+  { level: 4, name: 'Demonstrates consistently', hint: 'Right every time, without hesitation.' },
+];
+
+/**
+ * Where a page sits on that scale, or 0 if it hasn't been attempted.
+ *
+ * The manual's wording drives the thresholds. Level 4 is "demonstrates skill
+ * correctly each time without hesitation", so one lucky perfect run is not
+ * enough — it takes two, which also matches the manual's note that progress
+ * between levels is not expected every lesson.
+ */
+export function skillLevel(page) {
+  const r = data.results[page];
+  if (!r?.done) return 0;
+  if ((r.clean || 0) >= 2) return 4;
+  if (r.best >= 0.8) return 3;
+  if (r.best >= 0.5) return 2;
+  return 1;
+}
+
+export function skillLevelName(level) {
+  return SKILL_LEVELS.find((s) => s.level === level)?.name ?? 'Not started';
+}
+
+/** How many pages sit at each level — [notStarted, l1, l2, l3, l4]. */
+export function skillSpread() {
+  const counts = [0, 0, 0, 0, 0];
+  for (const pg of PAGES) counts[skillLevel(pg.page)] += 1;
+  return counts;
+}
+
+/** True when every page is at Level 4 — the manual's promotion criterion. */
+export function readyForLiftOff() {
+  return PAGES.every((pg) => skillLevel(pg.page) === 4);
 }
 
 // ------------------------------------------------------------------ streak

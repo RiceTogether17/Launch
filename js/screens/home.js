@@ -3,7 +3,8 @@
 import { el } from '../dom.js';
 import { PAGES, TOTAL_PAGES, pageTitle } from '../data/pages.js';
 import {
-  completedCount, getState, levelFromXp, maxStars, nextPage, setName, totalStars,
+  SKILL_LEVELS, completedCount, getState, levelFromXp, maxStars, nextPage,
+  readyForLiftOff, setName, skillSpread, totalStars,
 } from '../state.js';
 
 export function render(host, go) {
@@ -11,6 +12,7 @@ export function render(host, go) {
   const done = completedCount();
   const { level, into, need } = levelFromXp(s.xp);
   const next = nextPage();
+  const spread = skillSpread();
   const nextPg = PAGES.find((p) => p.page === next);
   const finished = done === TOTAL_PAGES;
 
@@ -47,6 +49,24 @@ export function render(host, go) {
           el('div.stat', {}, [el('b', { text: `🔥 ${s.streak.count}` }), el('span', { text: 'day streak' })]),
           el('div.stat', {}, [el('b', { text: `🏅 ${s.badges.length}` }), el('span', { text: 'trophies' })]),
         ]),
+      ]),
+
+      // The Outcomes Record: where the child sits against the programme's own
+      // promotion criterion, which is Level 4 on every outcome (CDM p7).
+      el('section.card.stack', {}, [
+        el('h2', { text: 'Outcomes record' }),
+        el('p.muted', { style: { marginTop: '-4px' } }, [
+          readyForLiftOff()
+            ? 'Level 4 on every page — the criterion for moving up to LiftOff.'
+            : 'LiftOff asks for Level 4 on every page.',
+        ]),
+        el('div.levels', {}, SKILL_LEVELS.map((s2) => el('div.level-row', {}, [
+          el('span.level-pip', { text: s2.level, 'data-level': s2.level }),
+          el('div', {}, [el('b', { text: s2.name }), el('span.muted', { text: ` — ${s2.hint}` })]),
+          el('span.level-count', { text: spread[s2.level] }),
+        ]))),
+        spread[0] ? el('p.muted', { style: { margin: 0, fontSize: '13px' } },
+          [`${spread[0]} page${spread[0] === 1 ? '' : 's'} not started yet.`]) : null,
       ]),
 
       finished

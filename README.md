@@ -32,7 +32,7 @@ rules are needed.
 | **Phonics** — *"draw a line from each picture to the letter"* | Tap a picture, tap a letter, and a line is drawn between them. |
 | **Phonics / Segmenting** — write the missing letter | The word is laid out one letter per box with one empty; tap the letter that fills it. |
 | **Phonics** — hexagon word completion | Six letters, six words, each letter used exactly once — spend one on the wrong word and another word goes short, just like on paper. |
-| **Phonics — Automatic Access** (teacher-timed) | Say each letter's sound aloud, then tap it, working through the scrambled chart. The clock runs and every attempt is recorded, as the workbook does — but nothing urges the child to hurry. |
+| **Phonics — Automatic Access** (teacher-timed) | The child says each letter's sound aloud and the app listens, which is what the manual actually defines the skill as. Naming the letter instead of sounding it gets the teacher's own correction. Falls back to tapping wherever the microphone can't be used. |
 
 ### Sound
 
@@ -64,6 +64,13 @@ several decisions that look arbitrary are taken straight from it:
   (p32) Pictures carry no captions; tap one to hear its name, which is how the
   teacher supports a child with limited vocabulary (p34). Names remain in
   `aria-label` for screen readers.
+- **Automatic Access means saying the sound.** The manual defines it as being
+  able to "look at a letter and correctly pronounce the corresponding phoneme
+  (sound) without hesitation" (p29), so the child speaks and the app listens
+  rather than testing alphabetical order. When a sound is missed, the app does
+  what the manual tells the teacher to do: offer a word beginning with that
+  sound, let the child hear it, and move on. Saying the letter's *name* is
+  treated as the specific confusion the manual asks teachers to correct (p12).
 - **Automatic Access is not a race.** "Do not turn the Automatic Access activity
   into a competition or race... Mispronunciation of sounds will occur when
   students rush." (p29) The clock runs and each attempt is logged, because the
@@ -77,7 +84,14 @@ several decisions that look arbitrary are taken straight from it:
 
 ### Rewards
 
-- **Stars** — 1–3 per page, from how much you got right *first try*.
+- **Stars** — 1–3 per page, from how much you got right *first try*. These are
+  the child-facing reward; the record below is the one that means something.
+- **Skill levels 1–4** — the programme's own scale, from the LaunchPad
+  Outcomes Record (p7): Introduced, Emerging, Demonstrates occasionally,
+  Demonstrates consistently. Level 4 needs two clean runs, not one, because the
+  manual defines it as demonstrating "correctly each time without hesitation".
+  Level 4 across every page is the criterion for promotion to LiftOff, and the
+  home screen shows how many pages sit at each level.
 - **XP and levels** — levels get progressively longer; replaying a page pays
   a quarter of the XP, so grinding one easy page isn't a shortcut.
 - **Streaks** — consecutive days played.
@@ -98,6 +112,22 @@ read as two different words, which would make the phonics wrong — a picture
 with an unmistakable name is substituted. The skill being practised, the
 target sound, the letter options and the page order are all the workbook's.
 
+### About the microphone
+
+Speech recognition in Chrome is not done on the device: audio is sent to
+Google's servers for transcription. So the microphone needs a network
+connection, and a child's voice leaves the machine. It is never switched on by
+itself — the child taps to speak each time — and every page keeps a full
+tapping fallback, used automatically when the microphone is declined, blocked
+or unsupported (Firefox and Safari among them). If that trade-off isn't one you
+want, the tapping mode alone is a complete way to work through these pages.
+
+Recognisers are also built to hear words, not bare phonemes, so the judging is
+deliberately generous: several alternatives are considered, the Grapheme Wall
+Chart's key word counts as correct, and where a letter's name genuinely cannot
+be told apart from its sound (`/s/` versus "ess") the answer is accepted rather
+than risk marking a correct child wrong.
+
 ## Layout
 
 ```
@@ -110,9 +140,12 @@ js/
   fx.js                     confetti, floating XP, toasts
   dom.js                    small element helper
   data/pages.js             all 51 pages of content
+  phonemeMatch.js           judging a spoken letter sound (pure, tested)
+  listen.js                 Web Speech API recogniser wrapper
   activities/               one module per exercise type
   screens/                  home, map, activity host, trophies
 tools/check-content.mjs     content consistency check
+tools/check-speech.mjs      tests for the spoken-sound judge
 ```
 
 ### Adding or editing a page
@@ -123,7 +156,14 @@ Edit `js/data/pages.js`, then run:
 node tools/check-content.mjs
 ```
 
-It checks all 51 pages for the mistakes that are easy to make by hand: an
+There is a second check for the speech matching, which can't be driven in a
+headless browser:
+
+```sh
+node tools/check-speech.mjs
+```
+
+The content check covers all 51 pages for the mistakes that are easy to make by hand: an
 answer missing from its own options, a hexagon whose letters don't spell its
 words, a picture filed under the wrong sound, a segmenting blank in the wrong
 position. English spelling isn't phonetic, so words whose sound and spelling

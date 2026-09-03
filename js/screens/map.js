@@ -2,7 +2,7 @@
 
 import { el, starString } from '../dom.js';
 import { PAGES, pageIcon, pageTitle } from '../data/pages.js';
-import { isUnlocked, nextPage, resultFor } from '../state.js';
+import { isUnlocked, nextPage, resultFor, skillLevel, skillLevelName } from '../state.js';
 import { toast } from '../fx.js';
 
 const STAGE_SIZE = 10;
@@ -39,6 +39,7 @@ export function render(host, go) {
     const grid = el('div.map-grid');
     for (const page of section.pages) {
       const result = resultFor(page.page);
+      const level = skillLevel(page.page);
       const unlocked = isUnlocked(page.page);
       const classes = [
         'node',
@@ -51,7 +52,9 @@ export function render(host, go) {
         el(`button.${classes.split(' ').join('.')}`, {
           type: 'button',
           title: pageTitle(page),
-          'aria-label': `Page ${page.page}: ${pageTitle(page)}${unlocked ? '' : ' (locked)'}`,
+          'aria-label': `Page ${page.page}: ${pageTitle(page)}${
+            level ? `, level ${level}, ${skillLevelName(level)}` : ''
+          }${unlocked ? '' : ' (locked)'}`,
           onclick: () => {
             if (!unlocked) {
               toast('Finish the page before this one first.', { icon: '🔒' });
@@ -60,6 +63,11 @@ export function render(host, go) {
             go(`#/page/${page.page}`);
           },
         }, [
+          level ? el('span.level-pip', {
+            text: level,
+            title: skillLevelName(level),
+            'data-level': level,
+          }) : null,
           el('span.icon', { text: unlocked ? pageIcon(page) : '🔒' }),
           el('span.num', { text: `Page ${page.page}` }),
           el('span.stars', { text: result?.done ? starString(result.stars) : '' }),

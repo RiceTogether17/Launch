@@ -5,7 +5,7 @@
 
 import { el, starString } from '../dom.js';
 import { PAGES, pageTitle } from '../data/pages.js';
-import { completePage, badgeById, isUnlocked, nextPage } from '../state.js';
+import { badgeById, completePage, isUnlocked, nextPage, skillLevel, skillLevelName } from '../state.js';
 import { confetti, toast } from '../fx.js';
 import { sfx } from '../audio.js';
 
@@ -85,6 +85,12 @@ function showReward(host, stage, go, page, accuracy) {
           el('div.stat', {}, [el('b', { text: `+${xp}` }), el('span', { text: 'XP' })]),
           el('div.stat', {}, [el('b', { text: `${Math.round(clamped * 100)}%` }), el('span', { text: 'correct' })]),
           el('div.stat', {}, [el('b', { text: `${stars}` }), el('span', { text: 'stars' })]),
+        ]),
+        // The record a teacher would keep, in the Outcomes Record's language.
+        el('div.level-note', {}, [
+          el('b', { text: `Level ${skillLevel(page.page)}` }),
+          ' · ',
+          skillLevelName(skillLevel(page.page)),
         ]),
       ]),
 

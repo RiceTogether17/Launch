@@ -692,7 +692,7 @@ export function pageIcon(pg) {
     case 'matchLetter':  return '🔗';
     case 'segment':      return '🧩';
     case 'hexagon':      return '⬡';
-    case 'automaticAccess': return '⏱️';
+    case 'automaticAccess': return '🔤';
     default:             return '📘';
   }
 }

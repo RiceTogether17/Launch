@@ -535,6 +535,29 @@ p  { margin: 0 0 .8em; }
   transition: width .15s linear;
 }
 
+/* ------------------------------------------------- phonics automatic access */
+
+.access-stage { text-align: center; }
+
+/* The letter currently being sounded out, big enough to read across a table. */
+.access-target {
+  font-size: clamp(72px, 22vw, 120px);
+  font-weight: 800;
+  line-height: 1.05;
+  font-family: ui-rounded, "Segoe UI", system-ui, sans-serif;
+  color: var(--brand);
+}
+
+.btn.listening {
+  background: var(--good);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--good) 60%, #000);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { filter: brightness(1.15); }
+}
+
 /* ------------------------------------------------------------- alphabet */
 
 .alpha-grid {
@@ -554,6 +577,11 @@ p  { margin: 0 0 .8em; }
   font-family: ui-rounded, "Segoe UI", system-ui, sans-serif;
 }
 .alpha.done { background: var(--good-soft); border-color: var(--good); color: var(--good); opacity: .6; }
+.alpha.current {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-2));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .alpha.miss { border-color: var(--bad); background: var(--bad-soft); }
 .timer {
   font-size: 34px;
@@ -595,6 +623,51 @@ p  { margin: 0 0 .8em; }
   from { transform: scale(.2) rotate(-30deg); opacity: 0; }
   70%  { transform: scale(1.25); }
   to   { transform: scale(1); opacity: 1; }
+}
+
+/* --------------------------------------------------------- outcomes record */
+
+/* The level a teacher would circle on the Outcomes Record sheet. */
+.level-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--ink-soft);
+  flex: none;
+}
+.level-pip[data-level="1"] { background: #a78bfa; }
+.level-pip[data-level="2"] { background: #38bdf8; }
+.level-pip[data-level="3"] { background: #f59e0b; color: #3b2500; }
+.level-pip[data-level="4"] { background: var(--good); }
+
+.node .level-pip { position: absolute; top: 6px; right: 6px; }
+
+.levels { display: grid; gap: 8px; }
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  font-size: 13px;
+}
+.level-row > div { flex: 1; min-width: 0; }
+.level-row b { display: block; }
+.level-row .muted { font-size: 12px; }
+.level-count { font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
+
+.level-note {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  font-size: 14px;
 }
 
 /* -------------------------------------------------------------------- fx */
