@@ -32,15 +32,48 @@ rules are needed.
 | **Phonics** — *"draw a line from each picture to the letter"* | Tap a picture, tap a letter, and a line is drawn between them. |
 | **Phonics / Segmenting** — write the missing letter | The word is laid out one letter per box with one empty; tap the letter that fills it. |
 | **Phonics** — hexagon word completion | Six letters, six words, each letter used exactly once — spend one on the wrong word and another word goes short, just like on paper. |
-| **Alphabet — automatic access** (teacher-timed) | An alphabet race: tap the scrambled letters in order against the clock. Best time is kept, so the child races themselves. |
+| **Phonics — Automatic Access** (teacher-timed) | Say each letter's sound aloud, then tap it, working through the scrambled chart. The clock runs and every attempt is recorded, as the workbook does — but nothing urges the child to hurry. |
 
 ### Sound
 
 Words and letter sounds are spoken with the Web Speech API — this is a
 phonics book, and for half these pages *hearing* the word is the exercise.
-Letters are voiced as sounds, not names: `/f/`, not "eff". The chimes are
-synthesised with WebAudio, so the app ships no audio files. Sound can be
-muted from the header.
+The chimes are synthesised with WebAudio, so the app ships no audio files.
+Sound can be muted from the header.
+
+Letters are voiced as sounds, not names, and *how* they are voiced follows the
+curriculum manual closely — see below.
+
+## Curriculum alignment
+
+The app is built against LCentral's *LaunchPad* Curriculum Delivery Manual, and
+several decisions that look arbitrary are taken straight from it:
+
+- **No "-uh" on consonants.** The manual (p20) calls out `/buh/`, `/cuh/`,
+  `/muh/`, `/luh/` as errors teachers must correct on the spot, because the
+  child is saying two sounds where there is one. A speech engine given `"buh"`
+  produces exactly that, and given `"b"` says the letter *name*. So continuants
+  and short vowels are spoken in isolation, where that is honest, and stops are
+  voiced as their Grapheme Wall Chart key word instead — the chart's own method.
+- **The word comes before the sound.** "The correct process is to say the
+  picture word firstly followed by the sound so the students hear the sound as
+  part of the word, not as a sound in isolation." (p12)
+- **No words printed on the picture pages.** "Words have purposely been omitted
+  from the phonemic awareness pages as the objective is for students to focus on
+  identifying sounds they hear... students may focus on spelling or phonics."
+  (p32) Pictures carry no captions; tap one to hear its name, which is how the
+  teacher supports a child with limited vocabulary (p34). Names remain in
+  `aria-label` for screen readers.
+- **Automatic Access is not a race.** "Do not turn the Automatic Access activity
+  into a competition or race... Mispronunciation of sounds will occur when
+  students rush." (p29) The clock runs and each attempt is logged, because the
+  workbook itself records seconds every lesson, but no wording urges speed,
+  stars come from accuracy alone, and the trophy is earned by a clean run rather
+  than a fast one.
+- **Short vowels only for phonics access** (p33), while phonemic awareness
+  ranges wider.
+- **`/ng/` and `/x/` never appear as first sounds**, as the manual notes they
+  do not occur word-initially in English (p12).
 
 ### Rewards
 
@@ -105,6 +138,6 @@ every picture and letter, and full support for `prefers-reduced-motion` and
 
 ---
 
-Built on the structure of *LaunchPad WorkBook 1* by LCentral. The workbook's
-content and clip art remain © 2017 LCentral Pte Ltd; this repository contains
-no artwork from it.
+Built on the structure of *LaunchPad WorkBook 1* and its Curriculum Delivery
+Manual by LCentral. The workbook's content and clip art remain
+© 2008–2017 LCentral Pte Ltd; this repository contains no artwork from it.

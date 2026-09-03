@@ -15,16 +15,16 @@ import * as pickLetter from '../activities/pickLetter.js';
 import * as matchLetter from '../activities/matchLetter.js';
 import * as segment from '../activities/segment.js';
 import * as hexagon from '../activities/hexagon.js';
-import * as alphabetRace from '../activities/alphabetRace.js';
+import * as automaticAccess from '../activities/automaticAccess.js';
 
 const ENGINES = {
-  soundSort, tracing, pickLetter, matchLetter, segment, hexagon, alphabetRace,
+  soundSort, tracing, pickLetter, matchLetter, segment, hexagon, automaticAccess,
 };
 
 /** XP is weighted by how much work a page actually is. */
 const XP = {
   soundSort: 25, tracing: 30, pickLetter: 25, matchLetter: 25,
-  segment: 25, hexagon: 30, alphabetRace: 35,
+  segment: 25, hexagon: 30, automaticAccess: 35,
 };
 
 export function render(host, go, pageNumber) {

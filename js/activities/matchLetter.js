@@ -35,10 +35,7 @@ export function mount(page, host, finish) {
       type: 'button',
       'aria-label': pair.pic.word,
       onclick: () => selectPic(pair, node),
-    }, [
-      el('span.art', { text: pair.pic.emoji }),
-      el('span.name', { text: pair.pic.word }),
-    ]);
+    }, [el('span.art', { text: pair.pic.emoji })]);
     picNodes.set(pair.pic.word, node);
     (i % 2 === 0 ? left : right).append(node);
   });
@@ -123,7 +120,7 @@ export function mount(page, host, finish) {
         el('div', {}, [
           el('h2', { text: `Match the ${where} sound` }),
           el('p.instruction', {
-            text: `Tap a picture, then tap the letter that makes its ${where} sound.`,
+            text: `Tap a picture to hear its word, then tap the letter that makes its ${where} sound.`,
           }),
         ]),
       ]),

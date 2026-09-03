@@ -315,8 +315,7 @@ p  { margin: 0 0 .8em; }
   transition: transform .1s, border-color .12s, background .2s;
 }
 .tile:hover { transform: translateY(-2px); }
-.tile .art { font-size: 46px; line-height: 1; filter: grayscale(1) opacity(.65); transition: filter .3s; }
-.tile .label { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.tile .art { font-size: 54px; line-height: 1; filter: grayscale(1) opacity(.65); transition: filter .3s; }
 /* "Colouring in" a tile: the picture gains its colour back. */
 .tile.picked .art { filter: none; }
 .tile.picked {
@@ -419,8 +418,7 @@ p  { margin: 0 0 .8em; }
 .match-item:hover { transform: translateY(-2px); }
 .match-item.active { border-color: var(--brand); background: var(--brand-soft); }
 .match-item.linked { border-color: var(--good); background: var(--good-soft); }
-.match-item .art { font-size: 34px; line-height: 1; }
-.match-item .name { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.match-item .art { font-size: 38px; line-height: 1; }
 .match-item .glyph { font-size: 30px; font-weight: 800; }
 .match svg.wires {
   position: absolute;

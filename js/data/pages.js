@@ -310,14 +310,14 @@ export const PAGES = [
   {
     page: 26,
     skill: 'Alphabet',
-    type: 'alphabetRace',
+    type: 'automaticAccess',
     letterCase: 'lower',
   },
   // --------------------------------------------------------------- page 27
   {
     page: 27,
     skill: 'Alphabet',
-    type: 'alphabetRace',
+    type: 'automaticAccess',
     letterCase: 'upper',
   },
   // --------------------------------------------------------------- page 28
@@ -676,8 +676,8 @@ export function pageTitle(pg) {
       return `Missing ${pg.position} letter`;
     case 'hexagon':
       return 'Hexagon words';
-    case 'alphabetRace':
-      return `Alphabet race — ${pg.letterCase === 'lower' ? 'lower' : 'UPPER'} case`;
+    case 'automaticAccess':
+      return `Automatic Access — ${pg.letterCase === 'lower' ? 'lower' : 'UPPER'} case`;
     default:
       return pg.skill;
   }
@@ -692,7 +692,7 @@ export function pageIcon(pg) {
     case 'matchLetter':  return '🔗';
     case 'segment':      return '🧩';
     case 'hexagon':      return '⬡';
-    case 'alphabetRace': return '⏱️';
+    case 'automaticAccess': return '⏱️';
     default:             return '📘';
   }
 }

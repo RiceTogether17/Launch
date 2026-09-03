@@ -32,7 +32,7 @@ export function render(host) {
       ]),
       grid,
       el('section.card', {}, [
-        el('h2', { text: 'Alphabet best times' }),
+        el('h2', { text: 'Automatic Access — last time taken' }),
         el('div.stat-grid', {}, [
           el('div.stat', {}, [
             el('b', { text: lower == null ? '—' : `${lower.toFixed(1)}s` }),

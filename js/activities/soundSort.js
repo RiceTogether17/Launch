@@ -8,7 +8,7 @@
  */
 
 import { el, shuffle } from '../dom.js';
-import { say, saySound, saySoundAndWord, sfx } from '../audio.js';
+import { hasIsolatedSound, say, saySound, sayWordThenSound, sfx } from '../audio.js';
 import { shake } from '../fx.js';
 
 export function mount(page, host, finish) {
@@ -26,13 +26,14 @@ export function mount(page, host, finish) {
       el('p.instruction', {
         text: `Tap every picture whose ${where} sound is the same as ${page.target.word}.`,
       }),
+      el('p.instruction', { text: 'Not sure what a picture is? Tap it to hear its name.' }),
     ]),
     el('button.say', {
       type: 'button',
       title: `Hear ${page.target.word}`,
       'aria-label': `Hear the word ${page.target.word}`,
       text: '🔊',
-      onclick: () => saySoundAndWord(page.sound, page.target.word),
+      onclick: () => sayWordThenSound(page.target.word, page.sound),
     }),
   ]);
 
@@ -47,7 +48,6 @@ export function mount(page, host, finish) {
       onclick: () => toggle(item, tile),
     }, [
       el('span.art', { text: item.emoji }),
-      el('span.label', { text: item.word }),
       el('span.mark'),
     ]);
     tiles.set(item.word, tile);
@@ -110,8 +110,10 @@ export function mount(page, host, finish) {
 
   const listenBtn = el('button.btn.ghost', {
     type: 'button',
-    text: `🔉 Hear the ${where} sound`,
-    onclick: () => saySound(page.sound),
+    text: hasIsolatedSound(page.sound)
+      ? `🔉 Hear the ${where} sound`
+      : `🔉 Hear "${page.target.word}" again`,
+    onclick: () => sayWordThenSound(page.target.word, page.sound),
   });
 
   host.append(
@@ -124,5 +126,5 @@ export function mount(page, host, finish) {
   );
 
   // Say the target once on arrival so the child hears what they're matching.
-  setTimeout(() => saySoundAndWord(page.sound, page.target.word), 400);
+  setTimeout(() => sayWordThenSound(page.target.word, page.sound), 400);
 }

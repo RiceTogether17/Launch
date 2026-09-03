@@ -99,7 +99,7 @@ for (const pg of PAGES) {
         if (n < 1) bad(pg, `find-letter row contains no "${pg.findLetter.letter}"`);
       }
       break;
-    case 'alphabetRace':
+    case 'automaticAccess':
       if (!['lower', 'upper'].includes(pg.letterCase)) bad(pg, 'bad letterCase');
       break;
     default:

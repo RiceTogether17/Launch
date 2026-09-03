@@ -17,8 +17,10 @@ const BLANK = {
   results: {},
   badges: [],
   streak: { count: 0, lastDay: '' },
-  /** Best alphabet-race times in seconds, by case. */
+  /** Most recent Automatic Access times in seconds, by case. */
   bestTimes: {},
+  /** Set once Automatic Access has been completed with no wrong taps. */
+  cleanAccess: false,
   sound: true,
 };
 
@@ -156,16 +158,18 @@ export function completePage(page, accuracy, baseXp = 20) {
   };
 }
 
-export function recordTime(letterCase, seconds) {
-  const key = `alphabet-${letterCase}`;
-  const best = data.bestTimes[key];
-  if (best == null || seconds < best) {
-    data.bestTimes[key] = seconds;
-    save();
-    emit();
-    return true;
-  }
-  return false;
+/**
+ * Record an Automatic Access attempt.
+ *
+ * The workbook records the seconds taken every lesson, so the app does too —
+ * but as a log of the latest attempt, not a high score to beat. `clean` says
+ * whether every letter was right, which is what actually earns the trophy.
+ */
+export function recordTime(letterCase, seconds, clean = false) {
+  data.bestTimes[`alphabet-${letterCase}`] = seconds;
+  if (clean) data.cleanAccess = true;
+  save();
+  emit();
 }
 
 export function bestTime(letterCase) {
@@ -194,7 +198,7 @@ export const BADGES = [
   { id: 'ten-perfect', icon: '✨', name: 'Star Collector', hint: 'Get 3 stars on 10 pages.' },
   { id: 'streak-3',    icon: '🔥', name: 'Three in a Row', hint: 'Play 3 days in a row.' },
   { id: 'streak-7',    icon: '☄️', name: 'Week Warrior',   hint: 'Play 7 days in a row.' },
-  { id: 'speedy',      icon: '⚡', name: 'Speedy Reader',  hint: 'Finish an alphabet race under 40 seconds.' },
+  { id: 'no-hesitation', icon: '⚡', name: 'No Hesitation', hint: 'Finish Automatic Access with every letter right.' },
   { id: 'scribe',      icon: '🖋️', name: 'Neat Writer',    hint: 'Get 3 stars on a writing page.' },
 ];
 
@@ -218,7 +222,10 @@ function awardBadges() {
   give('ten-perfect', threeStar.length >= 10);
   give('streak-3', data.streak.count >= 3);
   give('streak-7', data.streak.count >= 7);
-  give('speedy', Object.values(data.bestTimes).some((t) => t < 40));
+  // The manual's marker of automatic access is answering "without hesitation",
+  // and it is explicit that correctness beats speed — so this is earned by a
+  // clean run, not a fast one (CDM p29).
+  give('no-hesitation', data.cleanAccess === true);
   give(
     'scribe',
     threeStar.some((p) => p.type === 'tracing'),
