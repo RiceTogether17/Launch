@@ -74,12 +74,30 @@ stay is a full "buh", and it doesn't. **Nasals come out as a 30 ms blip**, too
 short to hear or copy; since a nasal is a steady hum, its middle is looped for
 a whole number of pitch periods, which joins without a click.
 
-The clips are plain 22 kHz mono WAVs (632 KB for the set), named after the
-sound they carry and loaded on demand. If you would rather have a real
-teacher's voice than a synthesised one, record over them with the same
-filenames — no code changes needed. If a clip is missing or fails to load, the
-app falls back to speaking the Grapheme Wall Chart's key word for that letter,
-so a broken file never leaves a child with silence.
+The clips are plain 22 kHz mono WAVs (562 KB for the set), named after the
+sound they carry and loaded on demand. If a clip is missing or fails to load,
+the app falls back to speaking the Grapheme Wall Chart's key word for that
+letter, so a broken file never leaves a child with silence.
+
+### Recording a real voice instead
+
+Formant synthesis is phonetically exact but unmistakably synthetic, and no
+setting changes that. For a phonics product the right answer is a human voice,
+so `tools/record.html` exists to make that a short job:
+
+```sh
+python3 -m http.server 8000        # then open /tools/record.html
+```
+
+It walks through all 29 sounds — every letter plus the four digraphs, since c
+and k share /k/, q is /kw/ and x is /ks/ — showing the wall chart's key word as
+the prompt and the manual's guidance on not adding a vowel. Each recording is
+trimmed, levelled to the same loudness as the generated set and saved as a
+22 kHz mono WAV under the right filename, so recordings drop straight into
+`audio/phonemes/` with no code change. Space bar records, arrow keys move.
+
+It needs `localhost` or https for microphone access. Nothing is uploaded — the
+recording never leaves the browser.
 
 ## Curriculum alignment
 
@@ -184,6 +202,7 @@ audio/phonemes/             one short clip per phoneme (generated)
   activities/               one module per exercise type
   screens/                  home, map, activity host, trophies
 tools/build-phonemes.py     generates the phoneme clips
+tools/record.html           record a real voice to replace them
 tools/check-content.mjs     content and audio-coverage check
 tools/check-speech.mjs      tests for the spoken-sound judge
 ```

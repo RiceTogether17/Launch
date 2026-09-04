@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Record the phoneme clips</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<style>
+  :root {
+    --bg: #f6f1ff; --card: #fff; --ink: #221a3d; --soft: #6b628c;
+    --line: #e2d9f7; --brand: #6d28d9; --good: #16a34a; --bad: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17132a; --card:#221c3d; --ink:#f3efff; --soft:#a79ccb;
+            --line:#352c58; --brand:#a78bfa; --good:#4ade80; --bad:#f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { margin:0 0 4px; font-size: clamp(24px,5vw,32px); }
+  p { margin:0 0 12px; }
+  .muted { color: var(--soft); }
+  .card { background:var(--card); border:2px solid var(--line); border-radius:16px; padding:16px; margin-bottom:16px; }
+  .note { border-left:5px solid var(--brand); }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .btn { border:2px solid transparent; border-radius:12px; background:var(--brand); color:#fff;
+         font-weight:700; padding:10px 16px; }
+  .btn.ghost { background:var(--card); color:var(--ink); border-color:var(--line); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:10px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .glyph { font-size:30px; font-weight:800; width:64px; font-family:ui-rounded,"Segoe UI",system-ui; }
+  .word { color:var(--soft); font-size:14px; }
+  tr.done { background: color-mix(in srgb, var(--good) 12%, transparent); }
+  .rec { background: var(--bad); }
+  .rec.armed { animation: pulse .9s ease-in-out infinite; }
+  @keyframes pulse { 50% { filter: brightness(1.3); } }
+  .meter { height:8px; border-radius:99px; background:var(--line); overflow:hidden; width:90px; }
+  .meter > i { display:block; height:100%; width:0; background:var(--good); }
+  .status { font-size:13px; color:var(--soft); min-height:1.4em; }
+  kbd { background:var(--line); border-radius:6px; padding:1px 6px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Record the phoneme clips</h1>
+  <p class="muted">
+    Replaces the synthesised sounds in <code>audio/phonemes/</code> with a real voice.
+    Record each one, check it, then download. Filenames come out correct — drop them
+    straight into the folder, no code changes.
+  </p>
+
+  <div class="card note">
+    <strong>Say the sound, not the letter's name, and don't add a vowel.</strong>
+    <p class="muted" style="margin:6px 0 0">
+      The curriculum manual is specific about this: <em>/buh/, /cuh/, /muh/, /luh/</em>
+      are wrong, because the child then hears two sounds where there is one (CDM p20).
+      For <b>b d g p t k j ch</b> keep the release as short and clean as you can.
+      For <b>f l m n r s v z sh th ng</b> hold the sound for about half a second.
+      For <b>w</b> and <b>y</b> let it glide — these move, they can't be held still.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button class="btn" id="mic">Enable microphone</button>
+      <button class="btn ghost" id="all" disabled>Download everything recorded</button>
+      <span class="status" id="status">Microphone not enabled yet.</span>
+    </div>
+    <p class="muted" style="margin:10px 0 0;font-size:13px">
+      Press <kbd>Space</kbd> to start and stop recording the highlighted row.
+      Clips are trimmed, levelled and saved as 22 kHz mono WAV, matching the generated set.
+    </p>
+  </div>
+
+  <div class="card">
+    <table id="list"></table>
+  </div>
+</div>
+
+<script type="module">
+// The 29 sounds WorkBook 1 speaks. That covers all 26 letters plus the four
+// digraphs, since c and k share /k/, q is /kw/ and x is /ks/. Each carries the
+// Grapheme Wall Chart's
+// key word, so whoever records sees the same prompt the child does.
+const SOUNDS = [
+  ['b','bat'],['k','cat (c/k)'],['d','dog'],['f','fish'],['g','goat'],['h','horse'],
+  ['j','jet'],['l','lizard'],['m','mouth'],['n','noodles'],['p','pig'],['kw','queen (qu)'],
+  ['r','rat'],['s','starfish'],['t','tiger'],['v','van'],['w','worm'],['ks','axe (x)'],
+  ['y','yacht'],['z','zebra'],
+  ['ch','chick'],['sh','shell'],['th','thumb'],['ng','king'],
+  ['a','apple'],['e','eggs'],['i','insect'],['o','octopus'],['u','umbrella'],
+];
+
+const RATE = 22050;       // must match tools/build-phonemes.py
+const TARGET_RMS = 0.13;  // same loudness target as the generated clips
+const FADE_IN = 0.006, FADE_OUT = 0.03;
+
+const statusEl = document.getElementById('status');
+const listEl = document.getElementById('list');
+const allBtn = document.getElementById('all');
+const clips = new Map();       // id -> { blob, url, rms }
+let stream = null, recorder = null, chunks = [], activeId = null;
+let cursor = 0;
+
+// ---------------------------------------------------------------- recording
+
+document.getElementById('mic').addEventListener('click', async (ev) => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+    ev.target.disabled = true;
+    ev.target.textContent = 'Microphone ready';
+    statusEl.textContent = 'Ready. Pick a row, or press Space to record the highlighted one.';
+    highlight(0);
+  } catch (err) {
+    statusEl.textContent = `Microphone unavailable: ${err.name}. This page needs https or localhost.`;
+  }
+});
+
+async function toggle(id) {
+  if (!stream) { statusEl.textContent = 'Enable the microphone first.'; return; }
+  if (recorder && activeId === id) { recorder.stop(); return; }
+  if (recorder) recorder.stop();
+
+  activeId = id;
+  chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.onstop = async () => {
+    const raw = new Blob(chunks, { type: recorder.mimeType });
+    recorder = null;
+    await store(id, raw);
+    setRecording(null);
+  };
+  recorder.start();
+  setRecording(id);
+  statusEl.textContent = `Recording “${id}” — press again (or Space) to stop.`;
+}
+
+/** Decode, trim, level and re-encode as the WAV the app expects. */
+async function store(id, blob) {
+  const ac = new AudioContext();
+  let buf;
+  try {
+    buf = await ac.decodeAudioData(await blob.arrayBuffer());
+  } catch {
+    statusEl.textContent = 'Could not decode that recording — try again.';
+    ac.close();
+    return;
+  }
+  const mono = downmix(buf);
+  const resampled = await resample(mono, buf.sampleRate, RATE);
+  const shaped = shape(trim(resampled));
+  ac.close();
+
+  if (!shaped.length) {
+    statusEl.textContent = `Nothing audible in “${id}” — try again, a little louder.`;
+    return;
+  }
+
+  const wav = encodeWav(shaped, RATE);
+  const prev = clips.get(id);
+  if (prev) URL.revokeObjectURL(prev.url);
+  clips.set(id, { blob: wav, url: URL.createObjectURL(wav), ms: Math.round(shaped.length / RATE * 1000) });
+  allBtn.disabled = clips.size === 0;
+  render();
+  statusEl.textContent = `Kept “${id}” (${clips.get(id).ms} ms). Play it back to check.`;
+}
+
+function downmix(buf) {
+  if (buf.numberOfChannels === 1) return buf.getChannelData(0).slice();
+  const out = new Float32Array(buf.length);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < out.length; i++) out[i] += d[i] / buf.numberOfChannels;
+  }
+  return out;
+}
+
+async function resample(data, from, to) {
+  if (from === to) return data;
+  const off = new OfflineAudioContext(1, Math.ceil(data.length * to / from), to);
+  const b = off.createBuffer(1, data.length, from);
+  b.copyToChannel(data, 0);
+  const src = off.createBufferSource();
+  src.buffer = b;
+  src.connect(off.destination);
+  src.start();
+  return (await off.startRendering()).getChannelData(0).slice();
+}
+
+/** Drop the silence either side of the sound. */
+function trim(a, floor = 0.04) {
+  const win = Math.round(RATE * 0.005);
+  let peak = 0;
+  const env = [];
+  for (let i = 0; i < a.length; i += win) {
+    let s = 0;
+    for (let j = i; j < Math.min(i + win, a.length); j++) s += a[j] * a[j];
+    const r = Math.sqrt(s / win);
+    env.push(r);
+    peak = Math.max(peak, r);
+  }
+  if (!peak) return new Float32Array(0);
+  let lo = env.findIndex((v) => v > peak * floor);
+  let hi = env.length - 1;
+  while (hi > lo && env[hi] <= peak * floor) hi--;
+  return a.slice(Math.max(0, lo * win - win), Math.min(a.length, (hi + 2) * win));
+}
+
+/** Match loudness to the generated clips, then fade the edges. */
+function shape(a) {
+  if (!a.length) return a;
+  let s = 0;
+  for (const v of a) s += v * v;
+  const rms = Math.sqrt(s / a.length);
+  if (rms > 0) {
+    let gain = TARGET_RMS / rms;
+    let peak = 0;
+    for (const v of a) peak = Math.max(peak, Math.abs(v));
+    if (peak * gain > 0.95) gain = 0.95 / peak;
+    for (let i = 0; i < a.length; i++) a[i] *= gain;
+  }
+  const fi = Math.min(Math.round(RATE * FADE_IN), a.length >> 2);
+  const fo = Math.min(Math.round(RATE * FADE_OUT), a.length >> 1);
+  for (let i = 0; i < fi; i++) a[i] *= i / fi;
+  for (let i = 0; i < fo; i++) a[a.length - 1 - i] *= i / fo;
+  return a;
+}
+
+function encodeWav(samples, rate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  let o = 44;
+  for (const s of samples) {
+    const c = Math.max(-1, Math.min(1, s));
+    v.setInt16(o, c < 0 ? c * 0x8000 : c * 0x7fff, true);
+    o += 2;
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+// -------------------------------------------------------------------- view
+
+function setRecording(id) {
+  document.querySelectorAll('.rec').forEach((b) => {
+    b.classList.toggle('armed', b.dataset.id === id);
+    b.textContent = b.dataset.id === id ? '■ Stop' : '● Record';
+  });
+}
+
+function highlight(i) {
+  cursor = Math.max(0, Math.min(SOUNDS.length - 1, i));
+  document.querySelectorAll('tr').forEach((tr, n) => {
+    tr.style.outline = n === cursor ? '3px solid var(--brand)' : '';
+  });
+  document.querySelectorAll('tr')[cursor]?.scrollIntoView({ block: 'nearest' });
+}
+
+function render() {
+  listEl.innerHTML = '';
+  SOUNDS.forEach(([id, word], i) => {
+    const got = clips.get(id);
+    const tr = document.createElement('tr');
+    if (got) tr.className = 'done';
+    tr.innerHTML = `
+      <td class="glyph">${id}</td>
+      <td><div class="word">as in ${word}</div><div class="word">${id}.wav</div></td>
+      <td><button class="btn rec" data-id="${id}">● Record</button></td>
+      <td>${got ? `<audio controls src="${got.url}" style="height:34px;max-width:180px"></audio>` : '<span class="word">—</span>'}</td>
+      <td>${got ? `<a class="btn ghost" href="${got.url}" download="${id}.wav">Save</a>` : ''}</td>`;
+    tr.addEventListener('click', () => highlight(i));
+    listEl.append(tr);
+  });
+  listEl.querySelectorAll('.rec').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggle(b.dataset.id);
+  }));
+  highlight(cursor);
+  document.title = `Record the phoneme clips (${clips.size}/${SOUNDS.length})`;
+}
+
+allBtn.addEventListener('click', () => {
+  // Browsers throttle bulk downloads, so space them out.
+  [...clips.entries()].forEach(([id, c], i) => setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = c.url;
+    a.download = `${id}.wav`;
+    a.click();
+  }, i * 350));
+  statusEl.textContent = `Saving ${clips.size} files…`;
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); toggle(SOUNDS[cursor][0]); }
+  if (e.code === 'ArrowDown') { e.preventDefault(); highlight(cursor + 1); }
+  if (e.code === 'ArrowUp') { e.preventDefault(); highlight(cursor - 1); }
+});
+
+render();
+</script>
+</body>
+</html>
