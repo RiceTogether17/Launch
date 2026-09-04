@@ -39,7 +39,9 @@ OUT = os.path.join(HERE, '..', 'audio', 'phonemes')
 
 RATE = 22050
 SPEED = 100          # espeak words-per-minute; slower gives a longer, clearer sound
-VOWEL_TAIL_MS = 45   # how much of the following vowel a stop keeps
+VOWEL_TAIL_MS = 40   # how much of the following vowel a stop keeps
+GLIDE_TAIL_MS = 110  # a glide needs longer: its movement *is* the sound
+TARGET_RMS = 0.13    # loudness match across clips, in full-scale units
 FADE_OUT_MS = 30
 FADE_IN_MS = 6
 PEAK = 0.82          # normalisation target, leaving a little headroom
@@ -49,7 +51,17 @@ MIN_HELD_MS = 260    # a continuant shorter than this is stretched to it
 VOWEL = 'a'          # the vowel stops are released into, before being cut
 
 # id -> (espeak phoneme, kind, example word)
-# kind: 'vowel' and 'continuant' can be said alone; 'stop' cannot.
+#
+# kind decides how the clip is made, and the distinction is phonetic, not
+# cosmetic:
+#   vowel, continuant  hold still, so they can be said alone and stretched
+#   stop               silent alone; synthesised with a vowel and cut
+#   glide              also cannot be held, but for the opposite reason to a
+#                      stop: a glide *is* a movement. Freezing /w/ leaves a
+#                      steady "oo" and /y/ a steady "ee", so these keep a
+#                      longer run into the vowel and are never looped.
+#   cluster            two sounds in sequence (/ks/ is /k/ then /s/), so it
+#                      travels by nature and must not be stretched either.
 PHONEMES = {
     # --- consonants -------------------------------------------------------
     'b':  ('b',   'stop',       'bat'),
@@ -68,9 +80,9 @@ PHONEMES = {
     's':  ('s',   'continuant', 'starfish'),
     't':  ('t',   'stop',       'tiger'),
     'v':  ('v',   'continuant', 'van'),
-    'w':  ('w',   'continuant', 'worm'),
-    'ks': ('ks',  'continuant', 'axe'),
-    'y':  ('j',   'continuant', 'yacht'),    # espeak's j is the /y/ glide
+    'w':  ('w',   'glide',      'worm'),
+    'ks': ('ks',  'cluster',    'axe'),
+    'y':  ('j',   'glide',      'yacht'),    # espeak's j is the /y/ glide
     'z':  ('z',   'continuant', 'zebra'),
     # --- digraphs ---------------------------------------------------------
     'ch': ('tS',  'stop',       'chick'),
@@ -89,17 +101,17 @@ PHONEMES = {
     'a_long':  ('eI',  'vowel', 'ape'),
     'e_long':  ('i:',  'vowel', 'key'),
     'i_long':  ('aI',  'vowel', 'ice'),
-    'o_long':  ('@U',  'vowel', 'bow'),
+    'o_long':  ('oU',  'vowel', 'bow'),
     'u_long':  ('ju:', 'vowel', 'tube'),
     'oo_long': ('u:',  'vowel', 'moon'),
     # --- diphthongs -------------------------------------------------------
-    'ar':  ('A:', 'vowel', 'car'),
+    'ar':  ('A@', 'vowel', 'car'),
     'air': ('e@', 'vowel', 'chair'),
     'er':  ('3:', 'vowel', 'fern'),
-    'or':  ('O:', 'vowel', 'fork'),
+    'or':  ('O@', 'vowel', 'fork'),
     'ow':  ('aU', 'vowel', 'owl'),
     'oy':  ('OI', 'vowel', 'boy'),
-    'ear': ('I@', 'vowel', 'deer'),
+    'ear': ('i@', 'vowel', 'deer'),
 }
 
 
@@ -134,7 +146,7 @@ def trim(a, floor=0.04):
     return a[loud[0] * n: min(len(a), (loud[-1] + 1) * n)]
 
 
-def cut_stop(a):
+def cut_stop(a, tail_ms=VOWEL_TAIL_MS):
     """Keep the burst plus just enough vowel to carry the place of articulation."""
     e, n = energy(a)
     peak = e.max()
@@ -145,7 +157,7 @@ def cut_stop(a):
     if not len(onset) or not len(vowel):
         return a
     start = max(0, onset[0] * n - int(RATE * 0.008))
-    end = min(len(a), vowel[0] * n + int(RATE * VOWEL_TAIL_MS / 1000))
+    end = min(len(a), vowel[0] * n + int(RATE * tail_ms / 1000))
     return a[start:end]
 
 
@@ -196,9 +208,18 @@ def sustain(a, target_ms):
 def shape(a):
     """Cap the length, fade the edges, and normalise so every sound is equally loud."""
     a = a[: int(RATE * MAX_MS / 1000)]
-    peak = np.abs(a).max()
-    if peak > 0:
-        a = a / peak * PEAK * 32767
+
+    # Match on loudness rather than peak. A stop's peak is one brief burst, so
+    # normalising to it leaves the clip far quieter to the ear than a vowel
+    # given the same treatment — which is why the consonants sounded weak.
+    rms = np.sqrt((a ** 2).mean()) if len(a) else 0
+    if rms > 0:
+        gain = (TARGET_RMS * 32767) / rms
+        peak = np.abs(a).max() * gain
+        limit = PEAK * 32767
+        if peak > limit:
+            gain *= limit / peak
+        a = a * gain
 
     fade_in = min(int(RATE * FADE_IN_MS / 1000), len(a) // 4)
     fade_out = min(int(RATE * FADE_OUT_MS / 1000), len(a) // 2)
@@ -226,7 +247,7 @@ def click_at_joins(a, joins):
 
 
 def centroid(a):
-    """Spectral centroid in Hz — a rough 'brightness', used only for reporting."""
+    """Spectral centroid in Hz — a rough 'brightness'."""
     if not len(a):
         return 0.0
     spec = np.abs(np.fft.rfft(a * np.hanning(len(a))))
@@ -235,14 +256,32 @@ def centroid(a):
     return float((spec * freqs).sum() / total) if total else 0.0
 
 
+def movement(a):
+    """
+    How far the sound travels in timbre from start to finish, in Hz.
+
+    This is what separates a glide from a vowel. /w/ starts with rounded lips
+    and opens up; /y/ starts high and palatal and falls. If either comes out
+    flat it has been frozen into a plain vowel, which is the bug that made an
+    earlier version of these clips say "oo" and "ee".
+    """
+    k = int(RATE * 0.04)
+    if len(a) < k * 3:
+        return 0.0
+    return abs(centroid(a[-k:]) - centroid(a[:k]))
+
+
 def build():
     os.makedirs(OUT, exist_ok=True)
     problems = []
     rows = []
 
     for pid, (phon, kind, example) in PHONEMES.items():
-        if kind == 'stop':
-            raw, joins = cut_stop(espeak(phon + VOWEL)), []
+        if kind in ('stop', 'glide'):
+            tail = GLIDE_TAIL_MS if kind == 'glide' else VOWEL_TAIL_MS
+            raw, joins = cut_stop(espeak(phon + VOWEL), tail), []
+        elif kind == 'cluster':
+            raw, joins = trim(espeak(phon)), []
         else:
             raw, joins = sustain(trim(espeak(phon)), MIN_HELD_MS)
 
@@ -264,6 +303,13 @@ def build():
         if ms < 40:
             problems.append(f'{pid}: too short ({ms:.0f}ms)')
 
+        # A glide must move and a held sound must not; see movement().
+        moved = movement(out.astype(np.float64))
+        if kind == 'glide' and moved < 300:
+            problems.append(f'{pid}: glide is not moving ({moved:.0f}Hz) — frozen into a vowel')
+        if kind in ('vowel', 'continuant') and moved > 900:
+            problems.append(f'{pid}: held sound drifts too much ({moved:.0f}Hz)')
+
         # A click is a discontinuity that stands out against the signal's own
         # texture, so joins are judged locally. Comparing against a fixed
         # threshold instead would just flag every fricative, which is noise and
@@ -277,6 +323,18 @@ def build():
     print(f'{"id".ljust(width)}  kind        example     length     rms   centroid   maxjump')
     for pid, kind, example, ms, rms, cen, jump in rows:
         print(f'{pid.ljust(width)}  {kind:11} {example:10} {ms:6.0f}ms {rms:7.0f} {cen:8.0f}Hz {jump:9.0f}')
+
+    # /b/, /d/ and /g/ are told apart almost entirely by burst frequency, so
+    # if those collapse together the three become one indistinct thud.
+    bursts = {}
+    for pid in ('b', 'd', 'g'):
+        path = os.path.join(OUT, f'{pid}.wav')
+        with wave.open(path) as w:
+            a = np.frombuffer(w.readframes(w.getnframes()), dtype='<i2').astype(np.float64)
+        bursts[pid] = centroid(a[: int(RATE * 0.04)])
+    spread = max(bursts.values()) - min(bursts.values())
+    if spread < 800:
+        problems.append(f'b/d/g bursts are too alike ({spread:.0f}Hz apart) to tell apart')
 
     total = sum(os.path.getsize(os.path.join(OUT, f)) for f in os.listdir(OUT) if f.endswith('.wav'))
     print(f'\n{len(rows)} phonemes, {total/1024:.0f} KB total')
